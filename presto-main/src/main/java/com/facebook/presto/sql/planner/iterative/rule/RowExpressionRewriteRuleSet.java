@@ -382,6 +382,38 @@ public class RowExpressionRewriteRuleSet
         }
     }
 
+    private final class CardinalityMapValuesRewrite
+            implements Rule<ValuesNode>
+    {
+        @Override
+        public Pattern<ValuesNode> getPattern()
+        {
+            return values();
+        }
+
+        @Override
+        public Result apply(ValuesNode valuesNode, Captures captures, Context context)
+        {
+            boolean anyRewritten = false;
+            ImmutableList.Builder<List<RowExpression>> rows = ImmutableList.builder();
+            for (List<RowExpression> row : valuesNode.getRows()) {
+                ImmutableList.Builder<RowExpression> newRow = ImmutableList.builder();
+                for (RowExpression rowExpression : row) {
+                    RowExpression rewritten = rewriter.rewrite(rowExpression, context);
+                    if (!rewritten.equals(rowExpression)) {
+                        anyRewritten = true;
+                    }
+                    newRow.add(rewritten);
+                }
+                rows.add(newRow.build());
+            }
+            if (anyRewritten) {
+                return Result.ofPlanNode(new ValuesNode(valuesNode.getSourceLocation(), valuesNode.getId(), valuesNode.getOutputVariables(), rows.build()));
+            }
+            return Result.empty();
+        }
+    }
+
     private final class AggregationRowExpressionRewrite
             implements Rule<AggregationNode>
     {
